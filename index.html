@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Tablero de Repartos</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&family=Source+Serif+4:wght@600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+    <style>
+        :root {
+            --bg: #f2f4fa; --surface: #ffffff; --surface2: #f7f8fd; --ink: #1b2033; --muted: #636b85; --line: #dde1ee;
+            --navy: #1e2761; --hdr1: #1e2761; --hdr2: #33449b; --accent: #2c3c91; --accent-ink: #ffffff; --focus: #7f93ff;
+            --ok: #17784f; --ok-bg: #e2f3ea; --warn: #8f6200; --warn-bg: #fff2cc; --bad: #b32e2e; --bad-bg: #fbe5e5; --info: #2850bd; --info-bg: #e6edff;
+            --shadow: 0 1px 2px rgba(30,39,97,.08), 0 6px 18px rgba(30,39,97,.06);
+            --serif: "Source Serif 4", Georgia, serif; --sans: "Public Sans", system-ui, sans-serif;
+        }
+        * { box-sizing: border-box; }
+        [hidden] { display: none !important; }
+        body { margin: 0; padding: 0; background: var(--bg); color: var(--ink); font-family: var(--sans); font-size: 14px; line-height: 1.45; min-height: 100vh; display: flex; flex-direction: column; }
+        .gut { padding-left: max(16px, env(safe-area-inset-left,0px)); padding-right: max(16px, env(safe-area-inset-right,0px)); }
+        .in { max-width: 1280px; margin: 0 auto; width: 100%; }
+        button { font: inherit; color: inherit; cursor: pointer; border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 7px 12px; transition: all .15s ease; }
+        button:hover { border-color: var(--accent); }
+        button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+        button:disabled { opacity: .45; cursor: not-allowed; }
+        button.pri { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+        button.dng { color: var(--bad); } button.dng:hover { border-color: var(--bad); background: var(--bad-bg); }
+        input, select, textarea { font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; width: 100%; }
+        textarea { resize: vertical; }
+        label { display: block; font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 4px; }
+        header.top { background: linear-gradient(120deg, var(--hdr1), var(--hdr2)); color: #fff; padding-block: 18px; }
+        header .in { display: flex; flex-wrap: wrap; gap: 14px 24px; align-items: center; justify-content: space-between; }
+        header h1 { margin: 0; font-family: var(--serif); font-size: 24px; letter-spacing: .2px; }
+        header .sub { opacity: .78; font-size: 12.5px; margin-top: 2px; }
+        .tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+        .tools button { background: rgba(255,255,255,.12); border-color: rgba(255,255,255,.28); color: #fff; }
+        .tools button:hover { background: rgba(255,255,255,.22); border-color: #fff; }
+        .tools button.pri { background: #fff; color: var(--navy); border-color: #fff; }
+        .datebox { display: flex; align-items: center; gap: 4px; background: rgba(255,255,255,.12); border-radius: 10px; padding: 3px; }
+        .datebox button { border: 0; background: transparent; padding: 6px 10px; }
+        .datebox input { width: auto; background: transparent; border: 0; color: #fff; padding: 6px 4px; }
+        .datelabel { font-size: 12.5px; opacity: .85; width: 100%; margin-top: 4px; }
+        main { padding-block: 18px 48px; flex: 1; }
+        .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 16px; }
+        .kpi { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; box-shadow: var(--shadow); border-top: 3px solid var(--accent); }
+        .kpi small { display: block; color: var(--muted); font-size: 11px; letter-spacing: .7px; text-transform: uppercase; }
+        .kpi b { font-family: var(--serif); font-size: 28px; font-variant-numeric: tabular-nums; line-height: 1.2; }
+        .kpi.ok { border-top-color: var(--ok); } .kpi.ok b { color: var(--ok); }
+        .kpi.warn { border-top-color: var(--warn); } .kpi.warn b { color: var(--warn); }
+        .kpi.bad { border-top-color: var(--bad); } .kpi.bad b { color: var(--bad); }
+        .bar { display: flex; height: 8px; border-radius: 99px; overflow: hidden; background: var(--line); }
+        .bar i { display: block; } .bar .g { background: var(--ok); } .bar .r { background: var(--bad); }
+        .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin-bottom: 16px; }
+        .quick { display: flex; gap: 8px; flex-wrap: wrap; }
+        .quick textarea { flex: 1 1 320px; }
+        .hint { color: var(--muted); font-size: 12px; margin-top: 6px; }
+        .filters { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 8px; margin-bottom: 14px; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 400px), 1fr)); gap: 14px; align-items: start; }
+        .card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); min-width: 0; }
+        .card.open { grid-column: 1 / -1; }
+        .card.drop { outline: 2px dashed var(--accent); outline-offset: 2px; background: var(--info-bg); }
+        .card-top { display: flex; align-items: stretch; }
+        .card-h { flex: 1; text-align: left; border: 0; background: transparent; padding: 14px 8px 12px 16px; border-radius: 12px 0 0 12px; min-width: 0; }
+        .card-h:hover { background: var(--surface2); }
+        .card-edit { border: 0; background: transparent; color: var(--muted); padding: 0 14px; border-radius: 0 12px 0 0; }
+        .card-edit:hover { color: var(--accent); background: var(--surface2); }
+        .row { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; align-items: flex-start; }
+        .ttl { font-family: var(--serif); font-size: 19px; font-weight: 700; color: var(--accent); }
+        .sub2 { color: var(--muted); font-size: 12.5px; }
+        .badge { display: inline-block; padding: 2px 9px; border-radius: 99px; font-size: 11.5px; font-weight: 600; border: 1px solid transparent; white-space: nowrap; }
+        .b-ok { background: var(--ok-bg); color: var(--ok); border-color: var(--ok); }
+        .b-warn { background: var(--warn-bg); color: var(--warn); border-color: var(--warn); }
+        .b-bad { background: var(--bad-bg); color: var(--bad); border-color: var(--bad); }
+        .b-info { background: var(--info-bg); color: var(--info); border-color: var(--info); }
+        .b-gray { background: var(--surface2); color: var(--muted); border-color: var(--line); }
+        .chips { display: flex; gap: 6px; flex-wrap: wrap; font-size: 12px; margin-top: 8px; }
+        .chips span { padding: 1px 8px; border-radius: 6px; background: var(--surface2); font-variant-numeric: tabular-nums; }
+        .card-b { border-top: 1px solid var(--line); padding: 12px 14px 14px; }
+        .scroll { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        th { text-align: left; font-size: 11.5px; letter-spacing: .4px; text-transform: uppercase; color: var(--muted); padding: 6px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+        td { padding: 7px 8px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+        tbody tr:nth-child(even) { background: var(--surface2); }
+        tr[draggable=true] { cursor: grab; }
+        tr.dragging { opacity: .4; }
+        td small { display: block; color: var(--muted); font-size: 11.5px; }
+        td.n { color: var(--muted); font-variant-numeric: tabular-nums; width: 28px; }
+        .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--surface); }
+        .seg button { border: 0; border-radius: 0; padding: 4px 9px; font-size: 12px; background: transparent; color: var(--muted); }
+        .seg button+button { border-left: 1px solid var(--line); }
+        .seg button.on.pendiente { background: var(--warn-bg); color: var(--warn); font-weight: 700; }
+        .seg button.on.entregado { background: var(--ok-bg); color: var(--ok); font-weight: 700; }
+        .seg button.on.reagendado { background: var(--bad-bg); color: var(--bad); font-weight: 700; }
+        .cardtools { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+        .empty { grid-column: 1 / -1; text-align: center; padding: 36px 16px; border: 1px dashed var(--line); border-radius: 12px; background: var(--surface); color: var(--muted); }
+        .empty h2 { font-family: var(--serif); color: var(--ink); margin: 0 0 6px; font-size: 20px; }
+        h3 { font-family: var(--serif); font-size: 17px; margin: 22px 0 8px; color: var(--accent); }
+        .hist { list-style: none; margin: 0; padding: 0; max-height: 250px; overflow-y: auto; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+        .hist li { display: flex; gap: 10px; padding: 8px 12px; border-bottom: 1px solid var(--line); font-size: 12.5px; }
+        .hist li:last-child { border: 0; }
+        .hist time { color: var(--muted); white-space: nowrap; }
+        .overlay { position: fixed; inset: 0; background: rgba(10,14,40,.65); display: flex; align-items: center; justify-content: center; z-index: 100; padding: 16px; }
+        .box { background: var(--surface); color: var(--ink); border-radius: 14px; width: min(540px, 100%); box-shadow: 0 24px 70px rgba(0,0,0,.4); padding: 22px; max-height: 90vh; overflow-y: auto; }
+        .box h2 { font-family: var(--serif); margin: 0 0 12px; font-size: 20px; color: var(--accent); }
+        .fg { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 12px; }
+        .fg .full { grid-column: 1 / -1; }
+        .est { display: flex; gap: 8px; flex-wrap: wrap; }
+        .est label { display: flex; align-items: center; gap: 6px; border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; cursor: pointer; }
+        .mfoot { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; align-items: center; }
+        .mfoot .sp { flex: 1; }
+        .err { color: var(--bad); font-size: 13px; min-height: 18px; margin-top: 8px; font-weight: 600; }
+        #toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: 20px; background: var(--navy); color: #fff; border-radius: 10px; padding: 10px 16px; z-index: 200; box-shadow: 0 8px 30px rgba(0,0,0,.35); font-weight: 500; }
+        footer { border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; text-align: center; padding: 18px; background: var(--surface); margin-top: auto; }
+        @media(max-width: 720px) { .filters { grid-template-columns: 1fr 1fr; } .filters input { grid-column: 1 / -1; } .fg { grid-template-columns: 1fr; } header h1 { font-size: 21px; } }
+    </style>
+</head>
+<body>
+
+<!-- MÓDULO DE AUTENTICACIÓN FIREBASE -->
+<div id="auth-modal" class="overlay">
+    <div class="box" style="max-width: 380px; text-align: center;">
+        <h2>🔐 Acceso al Tablero</h2>
+        <p class="sub2" style="margin-bottom: 16px;">Inicia sesión con tu correo empresarial autorizado en Firebase</p>
+        <form id="login-form" style="display: flex; flex-direction: column; gap: 12px;">
+            <input type="email" id="auth-email" placeholder="correo@empresa.com" required>
+            <input type="password" id="auth-password" placeholder="Contraseña" required>
+            <button type="submit" class="pri" style="padding: 10px;">Ingresar al Sistema</button>
+        </form>
+        <div id="auth-err" class="err"></div>
+    </div>
+</div>
+
+<!-- APLICACIÓN PRINCIPAL -->
+<div id="app-container" hidden>
+    <header class="top gut">
+        <div class="in">
+            <div>
+                <h1>Tablero de Repartos</h1>
+                <div class="sub">Control diario por camión · entregas, áreas y clientes</div>
+            </div>
+            <div class="tools">
+                <div class="datebox">
+                    <button id="prev" title="Día anterior">‹</button>
+                    <input type="date" id="fecha">
+                    <button id="next" title="Día siguiente">›</button>
+                    <button id="hoy">Hoy</button>
+                </div>
+                <button class="pri" id="btn-new-cam">+ Camión</button>
+                <button id="exp-day">Excel del día</button>
+                <button id="exp-month">Excel del mes</button>
+                <button id="btn-logout" class="dng" style="background: rgba(255,255,255,.1); color: #fff; border-color: transparent;">Salir</button>
+            </div>
+            <div class="datelabel" id="datelabel"></div>
+        </div>
+    </header>
+
+    <main class="gut">
+        <div class="in">
+            <section class="kpis" id="kpis"></section>
+
+            <section class="panel">
+                <label for="quick">Carga rápida inteligente</label>
+                <div class="quick">
+                    <textarea id="quick" rows="2" placeholder="Camión 1, 20 entregas, local, chofer Juan Pérez, clientes: Cliente A, Cliente B"></textarea>
+                    <button class="pri" id="btn-quick">Agregar</button>
+                </div>
+                <div class="hint">Una línea por camión. Presiona para registrar en tiempo real en Firestore.</div>
+            </section>
+
+            <section class="filters">
+                <input type="search" id="q" placeholder="Buscar camión, chofer, cliente o remito...">
+                <select id="fArea">
+                    <option value="">Todas las áreas</option>
+                    <option>Local</option>
+                    <option>Gran Asunción</option>
+                    <option>Interior</option>
+                </select>
+                <select id="fEst">
+                    <option value="">Todos los estados</option>
+                    <option value="curso">En curso</option>
+                    <option value="novedades">Con reagendadas</option>
+                    <option value="completado">Completado</option>
+                </select>
+            </section>
+
+            <section class="grid" id="grid"></section>
+
+            <h3>Resumen Consolidado por Área</h3>
+            <div class="panel scroll" style="padding: 4px 8px;">
+                <table id="areas"></table>
+            </div>
+
+            <h3>Historial Reciente de Operaciones</h3>
+            <ul class="hist" id="hist"><li>Sin actividad registrada hoy.</li></ul>
+        </div>
+    </main>
+
+    <footer>
+        © 2026 Creado por Victor Mendoza. Todos los derechos reservados. Soporte : victorhernanpy@gmail.com
+    </footer>
+</div>
+
+<!-- MODALES Y TOAST -->
+<div id="modal" class="overlay" hidden><div class="box" id="mbox"></div></div>
+<div id="toast" hidden></div>
+
+<!-- FIREBASE SDK V10 -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.10.0/firebase-app.js";
+import { 
+    getFirestore, collection, addDoc, onSnapshot, updateDoc, doc, deleteDoc, query, where, orderBy, getDocs 
+} from "https://www.gstatic.com/firebasejs/10.10.0/firebase-firestore.js";
+import { 
+    getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged 
+} from "https://www.gstatic.com/firebasejs/10.10.0/firebase-auth.js";
+
+// CREDENCIALES INTEGRADAS DEL USUARIO
+const firebaseConfig = {
+    apiKey: "AIzaSyCx1WLCJ6BmmtGoBv3pi_mjSkWRAfPg0F0",
+    authDomain: "tablero-distribucion-b93f3.firebaseapp.com",
+    projectId: "tablero-distribucion-b93f3",
+    storageBucket: "tablero-distribucion-b93f3.firebasestorage.app",
+    messagingSenderId: "352394532315",
+    appId: "1:352394532315:web:1de0d1c3f5597d6252c3fe"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const auth = getAuth(app);
+
+const camsRef = collection(db, "camiones");
+const entsRef = collection(db, "entregas");
+const histRef = collection(db, "historial");
+
+const AREAS = ['Local', 'Gran Asunción', 'Interior'];
+const pad = n => String(n).padStart(2, '0');
+const isoOf = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+const addDays = (f, n) => { const d = new Date(f + 'T12:00:00'); d.setDate(d.getDate() + n); return isoOf(d); };
+const fmt = f => f ? f.slice(8, 10) + '/' + f.slice(5, 7) + '/' + f.slice(0, 4) : '';
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+let S = { fecha: isoOf(new Date()), cams: new Map(), ents: new Map(), hist: [], open: new Set(), q: '', fArea: '', fEst: '', currentUser: null };
+let unsubs = [];
+
+/* AUTENTICACIÓN */
+onAuthStateChanged(auth, user => {
+    const authModal = document.getElementById('auth-modal');
+    const appContainer = document.getElementById('app-container');
+    if (user) {
+        S.currentUser = user;
+        authModal.hidden = true;
+        appContainer.hidden = false;
+        iniciarSubscripciones();
+    } else {
+        S.currentUser = null;
+        authModal.hidden = false;
+        appContainer.hidden = true;
+        cancelarSubscripciones();
+    }
+});
+
+document.getElementById('login-form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const errDiv = document.getElementById('auth-err'); errDiv.textContent = '';
+    try {
+        await signInWithEmailAndPassword(auth, document.getElementById('auth-email').value, document.getElementById('auth-password').value);
+        e.target.reset();
+    } catch (err) { errDiv.textContent = 'Error: Credenciales inválidas.'; }
+});
+
+document.getElementById('btn-logout').addEventListener('click', () => { if (confirm('¿Cerrar sesión?')) signOut(auth); });
+
+/* SUBSCRIPCIONES FIRESTORE */
+function cancelarSubscripciones() { unsubs.forEach(u => u()); unsubs = []; }
+function iniciarSubscripciones() {
+    cancelarSubscripciones();
+    const f = S.fecha;
+    unsubs.push(onSnapshot(query(camsRef, where("fecha", "==", f)), snap => { S.cams = new Map(snap.docs.map(d => [d.id, { id: d.id, ...d.data() }])); render(); }));
+    unsubs.push(onSnapshot(query(entsRef, where("fecha", "==", f)), snap => { S.ents = new Map(snap.docs.map(d => [d.id, { id: d.id, ...d.data() }])); render(); }));
+    unsubs.push(onSnapshot(query(histRef, orderBy("ts", "desc")), snap => { S.hist = snap.docs.slice(0, 25).map(d => ({ id: d.id, ...d.data() })); renderHist(); }));
+}
+
+async function logAction(text) {
+    try { await addDoc(histRef, { ts: Date.now(), text, fecha: S.fecha, user: S.currentUser ? S.currentUser.email : 'Anónimo' }); } catch (e) {}
+}
+
+const entsOf = camId => [...S.ents.values()].filter(e => e.camionId === camId).sort((a, b) => (a.ord || 0) - (b.ord || 0));
+
+function stats(c) {
+    const l = entsOf(c.id), ent = l.filter(e => e.estado === 'entregado').length, rea = l.filter(e => e.estado === 'reagendado').length, plan = Math.max(+c.plan || 0, l.length);
+    return { n: l.length, ent, rea, plan, pen: Math.max(plan - ent - rea, 0), cajas: l.reduce((a, e) => a + (+e.cajas || 0), 0) };
+}
+function estadoCam(c) { const s = stats(c); return s.plan > 0 && s.ent === s.plan ? 'completado' : s.rea > 0 ? 'novedades' : 'curso'; }
+
+/* INTERFAZ Y RENDERIZADO */
+function render() {
+    document.getElementById('fecha').value = S.fecha;
+    document.getElementById('datelabel').textContent = new Date(S.fecha + 'T12:00:00').toLocaleDateString('es-PY', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+
+    const cams = [...S.cams.values()].sort((a, b) => String(a.movil).localeCompare(String(b.movil), 'es', { numeric: true }));
+    let P = 0, E = 0, R = 0; cams.forEach(c => { const s = stats(c); P += s.plan; E += s.ent; R += s.rea; });
+    const pen = Math.max(P - E - R, 0), pct = P ? Math.round(E / P * 100) : 0;
+
+    document.getElementById('kpis').innerHTML =
+        `<div class="kpi"><small>Camiones</small><b>${cams.length}</b></div><div class="kpi"><small>Planificadas</small><b>${P}</b></div><div class="kpi ok"><small>Entregadas</small><b>${E}</b></div><div class="kpi warn"><small>Pendientes</small><b>${pen}</b></div><div class="kpi bad"><small>Reagendadas</small><b>${R}</b></div><div class="kpi ${pct >= 90 ? 'ok' : pct >= 60 ? 'warn' : 'bad'}"><small>Avance del día</small><b>${pct}%</b><div class="bar" style="margin-top:4px"><i class="g" style="width:${pct}%"></i></div></div>`;
+
+    const q = S.q.toLowerCase(), grid = document.getElementById('grid');
+    const list = cams.filter(c => {
+        if (S.fArea && c.area !== S.fArea) return false;
+        if (S.fEst && estadoCam(c) !== S.fEst) return false;
+        if (q) { const camMatch = (`camión ${c.movil} ${c.chofer || ''} ${c.area || ''}`).toLowerCase().includes(q); const entMatch = entsOf(c.id).some(e => [e.cliente, e.remito, e.destino].join(' ').toLowerCase().includes(q)); if (!camMatch && !entMatch) return false; }
+        return true;
+    });
+
+    if (!list.length) grid.innerHTML = `<div class="empty"><h2>Sin camiones registrados</h2>Haz clic en "+ Camión" o usa la Carga rápida para ingresar datos hoy.</div>`;
+    else grid.innerHTML = list.map(c => cardHTML(c)).join('');
+
+    document.getElementById('areas').innerHTML = '<thead><tr><th>Área</th><th>Camiones</th><th>Planificadas</th><th>Entregadas</th><th>Pendientes</th><th>Reagendadas</th><th>Avance</th></tr></thead><tbody>' +
+        AREAS.map(a => {
+            const cs = cams.filter(c => c.area === a); let p = 0, e = 0, r = 0; cs.forEach(c => { const s = stats(c); p += s.plan; e += s.ent; r += s.rea; }); const pc = p ? Math.round(e / p * 100) : 0;
+            return `<tr><td><b>${a}</b></td><td>${cs.length}</td><td>${p}</td><td>${e}</td><td>${Math.max(p - e - r, 0)}</td><td>${r}</td><td style="min-width:120px"><div class="bar"><i class="g" style="width:${pc}%"></i></div> <small>${pc}%</small></td></tr>`;
+        }).join('') + '</tbody>';
+}
+
+function cardHTML(c) {
+    const s = stats(c), pct = s.plan ? Math.round(s.ent / s.plan * 100) : 0, est = estadoCam(c), open = S.open.has(c.id) || !!S.q;
+    const eb = est === 'completado' ? '<span class="badge b-ok">Completado</span>' : est === 'novedades' ? '<span class="badge b-bad">Con reagendadas</span>' : '<span class="badge b-warn">En curso</span>';
+    const ab = c.area === 'Local' ? 'b-info' : c.area === 'Interior' ? 'b-warn' : 'b-gray', gw = s.plan ? s.ent / s.plan * 100 : 0, rw = s.plan ? s.rea / s.plan * 100 : 0;
+    let body = '';
+    if (open) {
+        const l = entsOf(c.id);
+        body = `<div class="card-b">${l.length ? `<div class="scroll"><table><thead><tr><th>#</th><th>Cliente</th><th>Mercadería</th><th>Destino</th><th>Estado</th><th>Motivo</th><th>Acción</th></tr></thead><tbody>` +
+            l.map((e, i) => `<tr draggable="true" data-ent="${e.id}"><td class="n">${i + 1}</td><td><b>${esc(e.cliente)}</b>${e.remito ? `<small>Remito: ${esc(e.remito)}</small>` : ''}</td><td>${esc(e.mercaderia) \vert{}\vert{} '—'}${e.cajas ? `<small>${esc(e.cajas)} cajas</small>` : ''}</td><td>${esc(e.destino) || '—'}</td><td><div class="seg">${['pendiente', 'entregado', 'reagendado'].map(v => `<button class="${v}${e.estado === v ? ' on' : ''}" onclick="window.appSetEstado('${e.id}','${v}')">${v === 'pendiente' ? 'Pend.' : v === 'entregado' ? 'Entregado' : 'Reag.'}</button>`).join('')}</div></td><td style="color:var(--bad); font-size:12px;">${esc(e.motivo)}</td><td><button onclick="window.appEditEnt('${e.id}')">Editar</button></td></tr>`).join('') + '</tbody></table></div>' : '<div class="sub2">Sin clientes asignados todavía.</div>'}<div class="cardtools"><button class="pri" onclick="window.appNewEnt('${c.id}')">+ Cliente</button></div></div>`;
+    }
+    return `<article class="card${open ? ' open' : ''}" data-cam="${c.id}"><div class="card-top"><button class="card-h" onclick="window.appToggleCard('${c.id}')"><div class="row"><div><div class="ttl">Camión ${esc(c.movil)}</div><div class="sub2">${c.chofer ? 'Chofer: ' + esc(c.chofer) : 'Sin chofer'}</div></div><div style="text-align:right"><span class="badge ${ab}">${esc(c.area || 'Local')}</span> ${eb}<div class="sub2" style="margin-top:4px"><b>${s.plan}</b> entregas</div></div></div><div class="bar" style="margin-top:12px"><i class="g" style="width:${gw}%"></i><i class="r" style="width:${rw}%"></i></div><div class="chips"><span style="color:var(--ok)">✔ ${s.ent} entregadas</span><span style="color:var(--warn)">${s.pen} pendientes</span><span style="color:var(--bad)">↻ ${s.rea} reagendadas</span><span>${pct}% avance</span></div></button><button class="card-edit" onclick="window.appEditCam('${c.id}')">Editar</button></div>${body}</article>`;
+}
+
+function renderHist() {
+    const h = S.hist; document.getElementById('hist').innerHTML = h.length ? h.map(x => { const d = new Date(x.ts); return `<li><time>${pad(d.getDate())}/${pad(d.getMonth() + 1)} ${pad(d.getHours())}:${pad(d.getMinutes())}</time><span>${esc(x.text)}</span> <small>(${esc(x.user)})</small></li>`; }).join('') : '<li>Sin actividad registrada hoy.</li>';
+}
+
+function showToast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.hidden = false; setTimeout(() => { t.hidden = true; }, 3500); }
+function closeModal() { document.getElementById('modal').hidden = true; }
+
+/* ACCIONES WINDOW GLOBALES */
+window.appToggleCard = id => { S.open.has(id) ? S.open.delete(id) : S.open.add(id); render(); };
+
+window.appSetEstado = async (id, estado) => {
+    const e = S.ents.get(id); if (!e) return;
+    if (estado === 'reagendado') { const mot = prompt('Ingrese el motivo de reagendamiento:', e.motivo || ''); if (mot === null) return; await updateDoc(doc(db, "entregas", id), { estado, motivo: mot }); } 
+    else { await updateDoc(doc(db, "entregas", id), { estado, motivo: '' }); }
+    await logAction(`Marcó '${e.cliente}' como ${estado}`); showToast(`Estado actualizado`);
+};
+
+window.appEditCam = id => {
+    const c = S.cams.get(id); if (!c) return;
+    document.getElementById('mbox').innerHTML = `<h2>Editar Camión ${esc(c.movil)}</h2><div class="fg"><div><label>Nº Camión / Móvil</label><input id="mc-movil" value="${esc(c.movil)}"></div><div><label>Chofer</label><input id="mc-chofer" value="${esc(c.chofer)}"></div><div><label>Área</label><select id="mc-area">${AREAS.map(a => `<option ${c.area === a ? 'selected' : ''}>${a}</option>`).join('')}</select></div><div><label>Planificadas</label><input type="number" id="mc-plan" value="${+c.plan || 0}"></div></div><div class="mfoot"><button class="pri" id="save-c">Guardar</button><button class="dng" id="del-c">Eliminar</button><button onclick="document.getElementById('modal').hidden=true">Cancelar</button></div>`;
+    document.getElementById('modal').hidden = false;
+    document.getElementById('save-c').onclick = async () => { await updateDoc(doc(db, "camiones", id), { movil: document.getElementById('mc-movil').value.trim(), chofer: document.getElementById('mc-chofer').value.trim(), area: document.getElementById('mc-area').value, plan: parseInt(document.getElementById('mc-plan').value) || 0 }); await logAction(`Editó Camión`); closeModal(); showToast('Actualizado'); };
+    document.getElementById('del-c').onclick = async () => { if (confirm(`¿Eliminar Camión y entregas?`)) { await deleteDoc(doc(db, "camiones", id)); entsOf(id).forEach(async e => await deleteDoc(doc(db, "entregas", e.id))); await logAction(`Eliminó Camión`); closeModal(); showToast('Eliminado'); } };
+};
+
+window.appNewEnt = camId => {
+    document.getElementById('mbox').innerHTML = `<h2>Agregar Cliente</h2><div class="fg"><div class="full"><label>Nombre Cliente *</label><input id="me-cli" required></div><div><label>Remito</label><input id="me-rem"></div><div><label>Mercadería</label><input id="me-merc"></div><div><label>Cajas</label><input type="number" id="me-cajas"></div><div><label>Destino</label><input id="me-dest"></div></div><div class="mfoot"><button class="pri" id="save-e">Guardar</button><button onclick="document.getElementById('modal').hidden=true">Cancelar</button></div>`;
+    document.getElementById('modal').hidden = false;
+    document.getElementById('save-e').onclick = async () => { const cli = document.getElementById('me-cli').value.trim(); if (!cli) return; await addDoc(entsRef, { camionId: camId, fecha: S.fecha, cliente: cli, remito: document.getElementById('me-rem').value.trim(), mercaderia: document.getElementById('me-merc').value.trim(), cajas: Number(document.getElementById('me-cajas').value) || '', destino: document.getElementById('me-dest').value.trim(), estado: 'pendiente', motivo: '', ord: Date.now() }); await logAction(`Agregó cliente '${cli}'`); closeModal(); showToast('Guardado'); };
+};
+
+window.appEditEnt = id => {
+    const e = S.ents.get(id); if (!e) return;
+    document.getElementById('mbox').innerHTML = `<h2>Editar Entrega</h2><div class="fg"><div class="full"><label>Nombre Cliente</label><input id="me-cli" value="${esc(e.cliente)}"></div><div><label>Remito</label><input id="me-rem" value="${esc(e.remito)}"></div><div><label>Mercadería</label><input id="me-merc" value="${esc(e.mercaderia)}"></div><div><label>Cajas</label><input type="number" id="me-cajas" value="${e.cajas || ''}"></div><div><label>Destino</label><input id="me-dest" value="${esc(e.destino)}"></div></div><div class="mfoot"><button class="pri" id="save-e">Actualizar</button><button class="dng" id="del-e">Eliminar</button><button onclick="document.getElementById('modal').hidden=true">Cancelar</button></div>`;
+    document.getElementById('modal').hidden = false;
+    document.getElementById('save-e').onclick = async () => { await updateDoc(doc(db, "entregas", id), { cliente: document.getElementById('me-cli').value.trim(), remito: document.getElementById('me-rem').value.trim(), mercaderia: document.getElementById('me-merc').value.trim(), cajas: Number(document.getElementById('me-cajas').value) || '', destino: document.getElementById('me-dest').value.trim() }); closeModal(); showToast('Actualizado'); };
+    document.getElementById('del-e').onclick = async () => { if (confirm(`¿Eliminar entrega?`)) { await deleteDoc(doc(db, "entregas", id)); closeModal(); showToast('Eliminado'); } };
+};
+
+/* ALTAS CAMIÓN Y CARGA RÁPIDA */
+document.getElementById('btn-new-cam').onclick = () => {
+    document.getElementById('mbox').innerHTML = `<h2>Nuevo Camión</h2><div class="fg"><div><label>Nº Camión / Móvil *</label><input id="mc-movil"></div><div><label>Chofer</label><input id="mc-chofer"></div><div><label>Área</label><select id="mc-area">${AREAS.map(a => `<option>${a}</option>`).join('')}</select></div><div><label>Planificadas</label><input type="number" id="mc-plan" value="0"></div><div class="full"><label>Clientes (separados por coma o salto)</label><textarea id="mc-list" rows="3"></textarea></div></div><div class="mfoot"><button class="pri" id="save-c">Crear</button><button onclick="document.getElementById('modal').hidden=true">Cancelar</button></div>`;
+    document.getElementById('modal').hidden = false;
+    document.getElementById('save-c').onclick = async () => {
+        const docRef = await addDoc(camsRef, { fecha: S.fecha, movil: document.getElementById('mc-movil').value.trim(), chofer: document.getElementById('mc-chofer').value.trim(), area: document.getElementById('mc-area').value, plan: parseInt(document.getElementById('mc-plan').value) || 0 });
+        const list = document.getElementById('mc-list').value.split(/[\n,]/).map(x => x.trim()).filter(Boolean);
+        for (let i = 0; i < list.length; i++) await addDoc(entsRef, { camionId: docRef.id, fecha: S.fecha, cliente: list[i], remito: '', mercaderia: '', cajas: '', destino: '', estado: 'pendiente', motivo: '', ord: Date.now() + i });
+        S.open.add(docRef.id); closeModal(); showToast('Creado');
+    };
+};
+
+document.getElementById('btn-quick').onclick = async () => {
+    const txt = document.getElementById('quick').value.trim(); if (!txt) return;
+    const mMovil = txt.match(/(?:camion|móvil|movil)\s*#?\s*([A-Za-z0-9]+)/i); if (!mMovil) return alert('Indica el camión');
+    const movil = mMovil[1], mChofer = txt.match(/chofer\s*:?\s*([^,;]+)/i), mPlan = txt.match(/(\d+)\s*(?:entregas|remitos)/i);
+    let area = 'Local'; if (/gran asunción|gran asuncion/i.test(txt)) area = 'Gran Asunción'; else if (/interior/i.test(txt)) area = 'Interior';
+    const cDoc = await addDoc(camsRef, { fecha: S.fecha, movil, chofer: mChofer ? mChofer[1].trim() : '', area, plan: mPlan ? +mPlan[1] : 0 });
+    const mCli = txt.match(/clientes?\s*:?\s*(.*)$/i);
+    if (mCli) { const list = mCli[1].split(/[,;]/).map(x => x.trim()).filter(Boolean); for (let i = 0; i < list.length; i++) await addDoc(entsRef, { camionId: cDoc.id, fecha: S.fecha, cliente: list[i], remito: '', mercaderia: '', cajas: '', destino: '', estado: 'pendiente', motivo: '', ord: Date.now() + i }); }
+    document.getElementById('quick').value = ''; showToast('Procesado');
+};
+
+/* FILTROS Y CONTROLES */
+const cambiarFecha = f => { S.fecha = f; S.open.clear(); iniciarSubscripciones(); };
+document.getElementById('fecha').onchange = e => cambiarFecha(e.target.value);
+document.getElementById('prev').onclick = () => cambiarFecha(addDays(S.fecha, -1));
+document.getElementById('next').onclick = () => cambiarFecha(addDays(S.fecha, 1));
+document.getElementById('hoy').onclick = () => cambiarFecha(isoOf(new Date()));
+document.getElementById('q').oninput = e => { S.q = e.target.value.trim(); render(); };
+document.getElementById('fArea').onchange = e => { S.fArea = e.target.value; render(); };
+document.getElementById('fEst').onchange = e => { S.fEst = e.target.value; render(); };
+
+/* EXPORTACIÓN EXCEL */
+document.getElementById('exp-day').onclick = () => {
+    if (typeof XLSX === 'undefined') return alert('Cargando Excel...');
+    const cams = [...S.cams.values()]; if (!cams.length) return alert('No hay datos.');
+    const res = [], det = [];
+    cams.forEach(c => {
+        const l = entsOf(c.id), ent = l.filter(e => e.estado === 'entregado').length, rea = l.filter(e => e.estado === 'reagendado').length, plan = Math.max(+c.plan || 0, l.length);
+        res.push({ Fecha: fmt(c.fecha), Camión: c.movil, Chofer: c.chofer || '', Área: c.area || '', Planificadas: plan, Entregadas: ent, Reagendadas: rea, Pendientes: Math.max(plan - ent - rea, 0), '% Avance': plan ? (ent / plan) : 0 });
+        l.forEach(e => det.push({ Fecha: fmt(e.fecha), Camión: c.movil, Cliente: e.cliente, Remito: e.remito || '', Destino: e.destino || '', Estado: e.estado, Motivo: e.motivo || '' }));
+    });
+    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(res), 'Resumen'); XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(det), 'Detalles'); XLSX.writeFile(wb, `Repartos_${S.fecha}.xlsx`);
+};
+
+document.getElementById('exp-month').onclick = async () => {
+    const mes = S.fecha.slice(0, 7);
+    const [snapC, snapE] = await Promise.all([getDocs(query(camsRef, where("fecha", ">=", mes + "-01"), where("fecha", "<=", mes + "-31"))), getDocs(query(entsRef, where("fecha", ">=", mes + "-01"), where("fecha", "<=", mes + "-31")))]);
+    const cams = snapC.docs.map(d => ({ id: d.id, ...d.data() })), ents = snapE.docs.map(d => ({ id: d.id, ...d.data() }));
+    if (!cams.length) return alert('No hay datos.');
+    const det = ents.map(e => { const c = cams.find(x => x.id === e.camionId) || {}; return { Fecha: fmt(e.fecha), Camión: c.movil || '', Cliente: e.cliente, Remito: e.remito || '', Estado: e.estado }; });
+    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(det), 'Mensual'); XLSX.writeFile(wb, `Repartos_${mes}.xlsx`);
+};
+
+/* DRAG & DROP */
+let dragEntId = null;
+document.addEventListener('dragstart', e => { const tr = e.target.closest('tr[data-ent]'); if (!tr) return; dragEntId = tr.dataset.ent; tr.classList.add('dragging'); });
+document.addEventListener('dragend', () => { dragEntId = null; document.querySelectorAll('.dragging, .drop').forEach(x => x.classList.remove('dragging', 'drop')); });
+document.addEventListener('dragover', e => { const card = e.target.closest('.card[data-cam]'); if (card && dragEntId) { e.preventDefault(); card.classList.add('drop'); } });
+document.addEventListener('drop', async e => { const card = e.target.closest('.card[data-cam]'); if (card && dragEntId) { e.preventDefault(); const tId = card.dataset.cam, ent = S.ents.get(dragEntId); if (ent && ent.camionId !== tId) { await updateDoc(doc(db, "entregas", dragEntId), { camionId: tId }); showToast('Movido'); } } });
+</script>
+</body>
+</html>
